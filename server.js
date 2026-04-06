@@ -19,20 +19,35 @@ function decodeXml(str) {
     .trim();
 }
 
+function decodeXml(str) {
+  return String(str || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
 function extractUrlsFromRelsXml(xml) {
   const urls = [];
+  const relationshipTags = String(xml || "").match(/<Relationship\b[^>]*\/?>/gi) || [];
 
-  const regex = /<Relationship\b[^>]*\bType="[^"]*\/hyperlink"[^>]*\bTarget="([^"]+)"[^>]*\bTargetMode="External"[^>]*\/?>/gi;
+  for (const tag of relationshipTags) {
+    const typeMatch = tag.match(/\bType=(["'])(.*?)\1/i);
+    const modeMatch = tag.match(/\bTargetMode=(["'])(.*?)\1/i);
+    const targetMatch = tag.match(/\bTarget=(["'])(.*?)\1/i);
 
-  let match;
-  while ((match = regex.exec(xml)) !== null) {
-    const url = decodeXml(match[1]);
-    if (/^https?:\/\//i.test(url)) {
-      urls.push(url);
+    const type = typeMatch ? typeMatch[2] : "";
+    const mode = modeMatch ? modeMatch[2] : "";
+    const target = targetMatch ? decodeXml(targetMatch[2]) : "";
+
+    if (/\/hyperlink$/i.test(type) && /^External$/i.test(mode) && /^https?:\/\//i.test(target)) {
+      urls.push(target);
     }
   }
 
-  return unique(urls);
+  return [...new Set(urls)];
 }
 
 app.get("/", (_req, res) => {
