@@ -5,20 +5,46 @@ import JSZip from "jszip";
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
+function unique(arr) {
+  return [...new Set(arr.filter(Boolean))];
+}
+
+function decodeXml(str) {
+  return String(str || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
 function extractUrlsFromRelsXml(xml) {
   const urls = [];
-  const regex = /<Relationship\b[^>]*Type="[^"]*\/hyperlink"[^>]*Target="([^"]+)"[^>]*TargetMode="External"[^>]*\/?>/gi;
+
+  const regex = /<Relationship\b[^>]*\bType="[^"]*\/hyperlink"[^>]*\bTarget="([^"]+)"[^>]*\bTargetMode="External"[^>]*\/?>/gi;
 
   let match;
   while ((match = regex.exec(xml)) !== null) {
-    const url = match[1].replace(/&amp;/g, '&').trim();
+    const url = decodeXml(match[1]);
     if (/^https?:\/\//i.test(url)) {
       urls.push(url);
     }
   }
 
-  return [...new Set(urls)];
+  return unique(urls);
 }
+
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "ppt-link-extractor",
+    endpoints: {
+      health: "/health",
+      extract: "/extract-urls",
+    },
+  });
+});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
@@ -29,18 +55,23 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         ok: false,
-        error: "No file uploaded. Use field name 'file'."
+        error: "No file uploaded. Use field name 'file'.",
       });
     }
 
     const fileName = req.file.originalname || "unknown";
     const buffer = req.file.buffer;
 
-    const zip = await JSZip.loadAsync(buffer);
+    console.log("Incoming file:", fileName, "size:", buffer.length);
 
-    const relPaths = Object.keys(zip.files).filter((name) =>
+    const zip = await JSZip.loadAsync(buffer);
+    const zipNames = Object.keys(zip.files);
+
+    const relPaths = zipNames.filter((name) =>
       /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/i.test(name)
     );
+
+    console.log("Found rel files:", relPaths);
 
     const allUrls = [];
     const urlsBySlide = {};
@@ -53,25 +84,30 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
 
       const urls = extractUrlsFromRelsXml(xml);
 
-      if (urls.length > 0) {
+      console.log("Slide", slideNumber, "urls:", urls);
+
+      if (slideNumber !== null) {
         urlsBySlide[String(slideNumber)] = urls;
-        allUrls.push(...urls);
       }
+
+      allUrls.push(...urls);
     }
 
-    const uniqueUrls = [...new Set(allUrls)];
+    const uniqueUrls = unique(allUrls);
 
-    res.json({
+    return res.json({
       ok: true,
       fileName,
       count: uniqueUrls.length,
       urls: uniqueUrls,
-      urlsBySlide
+      urlsBySlide,
+      relFilesFound: relPaths.length,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Extraction error:", error);
+    return res.status(500).json({
       ok: false,
-      error: error.message || "Unexpected error"
+      error: error.message || "Unexpected error",
     });
   }
 });
