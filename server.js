@@ -41,8 +41,8 @@ app.get("/", (_req, res) => {
     service: "ppt-link-extractor",
     endpoints: {
       health: "/health",
-      extract: "/extract-urls",
-    },
+      extract: "/extract-urls"
+    }
   });
 });
 
@@ -55,14 +55,12 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         ok: false,
-        error: "No file uploaded. Use field name 'file'.",
+        error: "No file uploaded. Use field name 'file'."
       });
     }
 
     const fileName = req.file.originalname || "unknown";
     const buffer = req.file.buffer;
-
-    console.log("Incoming file:", fileName, "size:", buffer.length);
 
     const zip = await JSZip.loadAsync(buffer);
     const zipNames = Object.keys(zip.files);
@@ -70,8 +68,6 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
     const relPaths = zipNames.filter((name) =>
       /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/i.test(name)
     );
-
-    console.log("Found rel files:", relPaths);
 
     const allUrls = [];
     const urlsBySlide = {};
@@ -83,8 +79,6 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
       const slideNumber = slideMatch ? Number(slideMatch[1]) : null;
 
       const urls = extractUrlsFromRelsXml(xml);
-
-      console.log("Slide", slideNumber, "urls:", urls);
 
       if (slideNumber !== null) {
         urlsBySlide[String(slideNumber)] = urls;
@@ -101,13 +95,13 @@ app.post("/extract-urls", upload.single("file"), async (req, res) => {
       count: uniqueUrls.length,
       urls: uniqueUrls,
       urlsBySlide,
-      relFilesFound: relPaths.length,
+      relFilesFound: relPaths.length
     });
   } catch (error) {
     console.error("Extraction error:", error);
     return res.status(500).json({
       ok: false,
-      error: error.message || "Unexpected error",
+      error: error.message || "Unexpected error"
     });
   }
 });
