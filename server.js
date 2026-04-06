@@ -11,7 +11,7 @@ function extractUrlsFromRelsXml(xml) {
 
   let match;
   while ((match = regex.exec(xml)) !== null) {
-    const url = match[1];
+    const url = match[1].replace(/&amp;/g, '&').trim();
     if (/^https?:\/\//i.test(url)) {
       urls.push(url);
     }
