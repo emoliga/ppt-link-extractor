@@ -19,16 +19,6 @@ function decodeXml(str) {
     .trim();
 }
 
-function decodeXml(str) {
-  return String(str || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .trim();
-}
-
 function extractUrlsFromRelsXml(xml) {
   const urls = [];
   const relationshipTags = String(xml || "").match(/<Relationship\b[^>]*\/?>/gi) || [];
